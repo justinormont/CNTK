@@ -40,8 +40,8 @@ public:
         size_t randomizationRangeInSamples,
         IDataDeserializerPtr deserializer,
         bool shouldPrefetch,
-        bool useLegacyRandomization = false,
-        bool multithreadedGetNextSequences = false);
+        bool multithreadedGetNextSequences = false,
+        bool useLocalTimeline = false);
 
     // Starts a new epoch.
     virtual void StartEpoch(const EpochConfiguration& config) override;
@@ -78,9 +78,6 @@ private:
     // Returns true if epoch end is reached.
     bool GetNextSequenceDescriptions(size_t sampleCount, std::vector<RandomizedSequenceDescription>& result, ClosedOpenChunkInterval& windowRange);
 
-    // Decimates sequence descriptions and loads chunks of data.
-    void Decimate(const std::vector<RandomizedSequenceDescription>& all, std::vector<RandomizedSequenceDescription>& decimated);
-
     // Prepares a new sweep if needed.
     void PrepareNewSweepIfNeeded(size_t samplePosition);
 
@@ -104,9 +101,6 @@ private:
 
     // Current sweep.
     size_t m_sweep;
-
-    // Global position of the current sweep in samples.
-    size_t m_sweepStartInSamples;
 
     // Total number of samples in a sweep.
     size_t m_sweepTotalNumberOfSamples;
@@ -149,6 +143,13 @@ private:
 
     // Current loaded chunks.
     ClosedOpenChunkInterval m_currentWindowRange;
+
+    // Sequence buffer, used to avoid reallocation only.
+    std::vector<RandomizedSequenceDescription> m_sequenceBuffer;
+
+    // Flag, indicating whether in distributed mode the minibatch is filled completely
+    // with data local to the worker.
+    bool m_useLocalTimeline;
 };
 
 }}}

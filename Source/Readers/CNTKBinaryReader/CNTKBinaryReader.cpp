@@ -57,7 +57,7 @@ CNTKBinaryReader::CNTKBinaryReader(const ConfigParameters& config)
         }
 
         m_packer = std::make_shared<SequencePacker>( m_sequenceEnumerator,
-                                                     ReaderBase::GetStreamDescriptions());
+                                                    ReaderBase::GetStreamDescriptions());
     }
     catch (const std::runtime_error& e)
     {

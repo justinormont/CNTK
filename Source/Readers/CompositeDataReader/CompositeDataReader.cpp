@@ -118,13 +118,12 @@ CompositeDataReader::CompositeDataReader(const ConfigParameters& config) :
 
         randomizationWindow = config(L"randomizationWindow", randomizationWindow);
 
-        // By default using STL random number generator.
-        bool useLegacyRandomization = config(L"useLegacyRandomization", false);
-        m_sequenceEnumerator = std::make_shared<BlockRandomizer>(verbosity, randomizationWindow, deserializer, true /* should Prefetch */, useLegacyRandomization, multiThreadedDeserialization);
+        bool shouldPrefetch = true;
+        m_sequenceEnumerator = std::make_shared<BlockRandomizer>(verbosity, randomizationWindow, deserializer, shouldPrefetch, multiThreadedDeserialization, localTimeline);
     }
     else
     {
-        m_sequenceEnumerator = std::make_shared<NoRandomizer>(deserializer, multiThreadedDeserialization);
+        m_sequenceEnumerator = std::make_shared<NoRandomizer>(deserializer, multiThreadedDeserialization, localTimeline);
     }
 
     // In case when there are transforms, applying them to the data.
@@ -146,18 +145,24 @@ CompositeDataReader::CompositeDataReader(const ConfigParameters& config) :
         m_streams.push_back(stream);
     }
 
+    // Currently for prefetch we use not more then two alternativing buffers,
+    // same is the default.
+    size_t numAlternatingBuffers = 2;
     switch (m_packingMode)
     {
     case PackingMode::sample:
         m_packer = std::make_shared<FramePacker>(
             m_sequenceEnumerator,
             m_streams,
+            numAlternatingBuffers,
             localTimeline);
         break;
     case PackingMode::sequence:
         m_packer = std::make_shared<SequencePacker>(
             m_sequenceEnumerator,
-            m_streams);
+            m_streams,
+            numAlternatingBuffers,
+            localTimeline);
         break;
     case PackingMode::truncated:
     {
