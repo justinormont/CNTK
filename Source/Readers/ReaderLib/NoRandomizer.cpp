@@ -77,32 +77,34 @@ void NoRandomizer::MoveToNextSequence()
     }
 }
 
-// Gets next sequence descriptions with total size less than sampleCount.
-void NoRandomizer::GetNextSequenceDescriptions(size_t globalSampleCount, size_t sampleCount, std::vector<SequenceDescription>& result)
+// Gets next sequences not exceeding localSampleCount for this worker and globalSampleCount accross workers.
+void NoRandomizer::GetNextSequenceDescriptions(size_t globalSampleCount, size_t localSampleCount, std::vector<SequenceDescription>& result)
 {
     assert(m_sequenceWindow.size() != 0);
     assert(m_chunkDescriptions[m_currentChunkPosition]->m_numberOfSequences > m_currentSequencePositionInChunk);
 
     if (globalSampleCount == 0)
-        LogicError("Global sample should never be zero.");
+        LogicError("Global sample count should never be zero.");
 
-    int samples = (int)sampleCount;
+    int localSamplesLeft = (int)localSampleCount;
     size_t totalSize = 0;
-    do
+    bool firstSequence = true;
+    while (totalSize < globalSampleCount)
     {
         const SequenceDescription& sequence = m_sequenceWindow[m_currentSequencePositionInChunk];
 
-        // Decimate.
-        bool decimated = false;
-        if (m_globalSequencePosition % m_config.m_numberOfWorkers == m_config.m_workerRank)
+        bool shouldCount = m_globalSequencePosition % m_config.m_numberOfWorkers == m_config.m_workerRank;
+        if (shouldCount)
         {
-            result.push_back(sequence);
-            decimated = true;
+            if (firstSequence || (localSamplesLeft >= (int)sequence.m_numberOfSamples && totalSize + sequence.m_numberOfSamples <= globalSampleCount))
+            {
+                result.push_back(sequence);
+                firstSequence = false;
+                localSamplesLeft -= sequence.m_numberOfSamples;
+            }
+            else
+                break;
         }
-
-        // Check the timeline.
-        if (!m_useLocalTimeline || decimated)
-            samples -= (int)sequence.m_numberOfSamples;
 
         m_globalSamplePosition += sequence.m_numberOfSamples;
         totalSize += sequence.m_numberOfSamples;
@@ -110,8 +112,6 @@ void NoRandomizer::GetNextSequenceDescriptions(size_t globalSampleCount, size_t 
 
         MoveToNextSequence();
     }
-    // Check whether the next sequence fits into the sample count, if not, exit.
-    while (samples - (int)m_sequenceWindow[m_currentSequencePositionInChunk].m_numberOfSamples >= 0 && totalSize < globalSampleCount);
 }
 
 size_t NoRandomizer::GetCurrentSamplePosition()
@@ -134,6 +134,10 @@ Sequences NoRandomizer::GetNextSequences(size_t sampleCount)
     size_t globalSampleCount = endOfEpochPosition - m_globalSamplePosition;
     globalSampleCount = std::min(globalSampleCount, m_totalNumberOfSamples - sweepPosition);
     assert(sampleCount != 0);
+    if (!m_useLocalTimeline)
+    {
+        globalSampleCount = std::min(sampleCount, globalSampleCount);
+    }
 
     m_sequenceBuffer.clear();
     GetNextSequenceDescriptions(globalSampleCount, sampleCount, m_sequenceBuffer);

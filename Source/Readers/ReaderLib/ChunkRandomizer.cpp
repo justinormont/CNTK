@@ -23,7 +23,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         return m_randomizedChunks;
     }
 
-    // Randomizes chunks depending on the mode (legacy or not) and calculates randomization windows.
+    // Randomizes chunks and calculates randomization windows.
     void ChunkRandomizer::Randomize(unsigned int seed)
     {
         std::vector<ChunkIdType> randomizedChunkIndices;

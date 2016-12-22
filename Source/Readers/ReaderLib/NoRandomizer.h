@@ -33,7 +33,7 @@ public:
     void SetConfiguration(const ReaderConfiguration& config) override;
 
 private:
-    // Gets next sequence descriptions with total size less than sampleCount.
+    // Gets next sequences not exceeding localSampleCount for this worker and globalSampleCount accross workers.
     void GetNextSequenceDescriptions(size_t globalSampleCount, size_t sampleCount, std::vector<SequenceDescription>& result);
 
     // Get chunk index for the sample offset from the beginning of the sweep.

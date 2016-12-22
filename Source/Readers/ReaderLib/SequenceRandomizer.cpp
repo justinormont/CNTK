@@ -74,7 +74,7 @@ namespace Microsoft { namespace MSR { namespace CNTK {
         if (globalSampleCount == 0)
             LogicError("Global sample should never be zero.");
 
-        int samples = (int)localSampleCount;
+        int localSamples = (int)localSampleCount;
 
         // Initialize the range to the current chunk.
         requiredChunks.m_begin = (ChunkIdType)std::min(m_currentChunkCursor, m_randomizedChunks.size() - 1);
@@ -94,11 +94,11 @@ namespace Microsoft { namespace MSR { namespace CNTK {
             bool shouldCount = isLocalSequence(sequence);
             if (shouldCount)
             {
-                if (firstSequence || samples >= sequenceLength)
+                if (firstSequence || (localSamples >= sequenceLength && totalSize + sequenceLength <= globalSampleCount))
                 {
                     firstSequence = false;
                     sequences.push_back(*sequence);
-                    samples -= sequenceLength;
+                    localSamples -= sequenceLength;
                 }
                 else // We exceeded the local sample count, have to break.
                     break;

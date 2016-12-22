@@ -111,6 +111,9 @@ void BlockRandomizer::PrepareNewSweepIfNeeded(size_t samplePosition)
 }
 
 // Gets next sequences not exceeding sampleCount.
+// Sample count is treated differently depending whether the m_useLocalTimeline is specifed:
+// - num of samples on a global timeline among all workers (m_useLocalTimeline == false)
+// - num of samples for this particular worker (m_useLocalTimeline == true)
 Sequences BlockRandomizer::GetNextSequences(size_t sampleCount)
 {
     // Get next sequence descriptions.
@@ -165,7 +168,7 @@ Sequences BlockRandomizer::GetNextSequences(size_t sampleCount)
     return result;
 }
 
-// Get next sequence descriptions that do not exceed sample count.
+// Get next sequence descriptions for that worker that do not exceed sample count.
 // Returns true if epoch end is reached.
 bool BlockRandomizer::GetNextSequenceDescriptions(size_t localSampleCount, std::vector<RandomizedSequenceDescription>& result, ClosedOpenChunkInterval& windowRange)
 {
@@ -180,22 +183,25 @@ bool BlockRandomizer::GetNextSequenceDescriptions(size_t localSampleCount, std::
     }
 
     // In case of the local timeline we only care about not exceeding the epoch boundary
-    // For global timeline case we should not exceed the given minibatch size in global samples.
+    // For the global timeline case in addition we should not exceed the given minibatch size in global samples.
     size_t globalSampleCount = m_epochSize + m_epochStartPosition - m_globalSamplePosition;
     assert(globalSampleCount != 0);
     if (!m_useLocalTimeline)
     {
-        globalSampleCount = std::min(localSampleCount, m_epochSize + m_epochStartPosition - m_globalSamplePosition);
+        globalSampleCount = std::min(localSampleCount, globalSampleCount);
     }
 
-    // Check that we do not go over the sweep, this potentially can lead to empty minibatches.
+    // Check that we do not go over the sweep.
     globalSampleCount = std::min(globalSampleCount, (long)m_sweepTotalNumberOfSamples - m_globalSamplePosition % m_sweepTotalNumberOfSamples);
+
+    // As the return value from sequence randomizer we still can get empty minibatches
+    // but the global sample count should not be zero at this point.
     assert(globalSampleCount != 0);
 
     std::function<bool(const RandomizedSequenceDescription*)> isLocalSequence =
         [this](const RandomizedSequenceDescription* s) { return s->m_chunk->m_chunkId % m_config.m_numberOfWorkers == m_config.m_workerRank; };
 
-    size_t minibatchSize = m_sequenceRandomizer->GetNextSequenceDescriptions(
+    size_t actualNumberOfGlobalSamples = m_sequenceRandomizer->GetNextSequenceDescriptions(
         globalSampleCount,
         localSampleCount,
         isLocalSequence,
@@ -204,11 +210,11 @@ bool BlockRandomizer::GetNextSequenceDescriptions(size_t localSampleCount, std::
 
     if (m_verbosity >= Debug)
         fprintf(stderr, "BlockRandomizer::GetNextSequenceDescriptions(): getting %" PRIu64 " sequences for %" PRIu64 " requested samples in sweep %" PRIu64 "\n",
-        result.size(),
-        minibatchSize,
-        m_sweep);
+                result.size(),
+                localSampleCount,
+                m_sweep);
 
-    m_globalSamplePosition += minibatchSize;
+    m_globalSamplePosition += actualNumberOfGlobalSamples;
 
     // return true if the current batch is last in an epoch.
     return m_globalSamplePosition >= m_epochSize + m_epochStartPosition;

@@ -46,7 +46,10 @@ public:
     // Starts a new epoch.
     virtual void StartEpoch(const EpochConfiguration& config) override;
 
-    // Gets next sequences.
+    // Gets next sequences not exceeding sampleCount.
+    // Sample count is treated differently depending whether the m_useLocalTimeline is specifed:
+    // - num of samples on a global timeline among all workers (m_useLocalTimeline == false)
+    // - num of samples for this particular worker (m_useLocalTimeline == true)
     virtual Sequences GetNextSequences(size_t sampleCount) override;
 
     // Gets stream descriptions.
@@ -76,7 +79,7 @@ private:
 
     // Get next sequence descriptions that do not exceed sample count.
     // Returns true if epoch end is reached.
-    bool GetNextSequenceDescriptions(size_t sampleCount, std::vector<RandomizedSequenceDescription>& result, ClosedOpenChunkInterval& windowRange);
+    bool GetNextSequenceDescriptions(size_t localSampleCount, std::vector<RandomizedSequenceDescription>& result, ClosedOpenChunkInterval& windowRange);
 
     // Prepares a new sweep if needed.
     void PrepareNewSweepIfNeeded(size_t samplePosition);
@@ -147,7 +150,7 @@ private:
     // Sequence buffer, used to avoid reallocation only.
     std::vector<RandomizedSequenceDescription> m_sequenceBuffer;
 
-    // Flag, indicating whether in distributed mode the minibatch is filled completely
+    // Flag indicating whether in distributed mode the minibatch is filled completely
     // with data local to the worker.
     bool m_useLocalTimeline;
 };
