@@ -190,7 +190,7 @@ bool BlockRandomizer::GetNextSequenceDescriptions(size_t localSampleCount, std::
 
     // Check that we do not go over the sweep, this potentially can lead to empty minibatches.
     globalSampleCount = std::min(globalSampleCount, (long)m_sweepTotalNumberOfSamples - m_globalSamplePosition % m_sweepTotalNumberOfSamples);
-    assert(globalCount != 0);
+    assert(globalSampleCount != 0);
 
     std::function<bool(const RandomizedSequenceDescription*)> isLocalSequence =
         [this](const RandomizedSequenceDescription* s) { return s->m_chunk->m_chunkId % m_config.m_numberOfWorkers == m_config.m_workerRank; };
